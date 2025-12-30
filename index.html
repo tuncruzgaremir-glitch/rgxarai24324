@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RGXAR AI | Neural Interface</title>
+    
+    <!-- External Resources -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --p: #7c3aed; --s: #06b6d4; --bg: #030712; --c: #111827;
+            --t: #f9fafb; --g: rgba(255,255,255,0.03); --glow: 0 0 20px rgba(124,58,237,0.4);
+        }
+
+        [data-theme="light"] {
+            --bg: #f8fafc; --c: #ffffff; --t: #1e293b; --g: rgba(0,0,0,0.1); --glow: 0 0 20px rgba(6,182,212,0.4);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background: var(--bg); color: var(--t); height: 100vh; overflow: hidden; transition: 0.5s; }
+
+        /* --- ANIMATED BACKGROUND --- */
+        .bg-animate {
+            position: fixed; inset: 0; z-index: -1;
+            background: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #030712 100%);
+            animation: bgLoop 10s infinite linear;
+        }
+        .bg-animate::after {            
+            content: ""; position: absolute; inset: 0;
+            background-image: url('https://grainy-gradients.vercel.app/noise.svg');
+            opacity: 0.05; pointer-events: none;
+        }
+        @keyframes bgLoop {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* --- SPLASH SCREEN --- */
+        #splash {
+            position: fixed; inset: 0; background: #000; z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            transition: 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }        
+        .logo-glow {
+            font-family: 'Orbitron'; font-size: 4rem; font-weight: 900;
+            background: linear-gradient(to right, var(--p), var(--s));            
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 15px var(--p));
+            animation: pulse 2s infinite;
+        }
+
+        /* --- AUTH SYSTEM --- */
+        #auth-screen {
+            position: fixed; inset: 0; z-index: 8000; display: none;
+            justify-content: center; align-items: center; background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(20px);
+        }
+        .auth-card {
+            background: var(--c); padding: 40px; border-radius: 32px;
+            width: 90%; max-width: 420px; border: 1px solid var(--g);
+            box-shadow: var(--glow); text-align: center;
+        }
+        .auth-tabs { display: flex; gap: 10px; margin-bottom: 30px; background: #000; padding: 5px; border-radius: 15px; }
+        .auth-tab { flex: 1; padding: 10px; cursor: pointer; border-radius: 12px; font-size: 14px; transition: 0.3s; }
+        .auth-tab.active { background: var(--p); color: white; }
+
+        /* --- LAYOUT --- */
+        #app-screen { display: none; flex-direction: column; height: 100vh; }
+        header {
+            padding: 20px 40px; display: flex; justify-content: space-between; align-items: center;
+            background: rgba(3, 7, 18, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid var(--g);
+        }
+        .user-chip { display: flex; align-items: center; gap: 12px; background: var(--g); padding: 8px 16px; border-radius: 100px; }
+
+        /* --- CHAT AREA --- */
+        #chat-flow {
+            flex: 1; overflow-y: auto; padding: 40px 20%; display: flex; flex-direction: column; gap: 25px;
+            scroll-behavior: smooth;
+        }
+        .msg { max-width: 85%; padding: 16px 24px; border-radius: 24px; font-size: 16px; line-height: 1.6; animation: msgIn 0.4s ease forwards; }
+        .bot { background: var(--c); align-self: flex-start; border: 1px solid var(--g); border-bottom-left-radius: 4px; }
+        .me { background: linear-gradient(135deg, var(--p), #4c1d95); align-self: flex-end; border-bottom-right-radius: 4px; box-shadow: var(--glow); }
+
+        /* --- INPUT --- */
+        .input-container { padding: 30px 20%; background: linear-gradient(to top, var(--bg), transparent); }
+        .input-wrapper {
+            background: var(--c); border: 1px solid var(--g); padding: 10px 10px 10px 25px;
+            border-radius: 20px; display: flex; align-items: center; gap: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: 0.3s;
+        }
+        .input-wrapper:focus-within { border-color: var(--p); transform: translateY(-2px); }
+        input { flex: 1; background: transparent; border: none; color: white; outline: none; font-size: 16px; }
+        .btn-send { background: var(--p); border: none; color: white; width: 45px; height: 45px; border-radius: 15px; cursor: pointer; transition: 0.3s; }
+        .btn-send:hover { transform: scale(1.1) rotate(-10deg); background: var(--s); }
+
+        /* --- MODAL --- */
+        .modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 9000;
+            display: none; justify-content: center; align-items: center;
+        }
+        .modal-body { background: var(--c); padding: 40px; border-radius: 30px; width: 90%; max-width: 600px; border: 1px solid var(--p); max-height: 80vh; overflow-y: auto; }
+
+        /* --- UTILS --- */
+        .btn-primary { background: var(--p); color: white; border: none; padding: 14px; border-radius: 15px; cursor: pointer; font-weight: 700; width: 100%; margin-top: 15px; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 14px; background: #000; border: 1px solid var(--g); border-radius: 12px; color: white; margin-bottom: 15px; }        
+        @keyframes msgIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) { #chat-flow, .input-container { padding: 20px 5%; } }
+
+        /* FPS Indicator */
+        #fps-indicator { position: fixed; bottom: 20px; left: 20px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 10px; font-size: 12px; z-index: 1000; }
+    </style>
+</head>
+<body data-theme="dark">
+
+<div class="bg-animate"></div>
+
+<!-- FPS Indicator -->
+<div id="fps-indicator">FPS: 60</div>
+
+<!-- SPLASH -->
+<div id="splash">
+    <div class="logo-glow">RGXAR</div>
+    <div style="color: var(--s); letter-spacing: 5px; font-size: 12px; margin-top: 10px;">INITIALIZING CORE...</div>
+</div>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+    <div class="auth-card">
+        <div class="auth-tabs">
+            <div class="auth-tab active" id="tab-login" onclick="toggleAuth('login')">Giriş Yap</div>
+            <div class="auth-tab" id="tab-register" onclick="toggleAuth('register')">Kayıt Ol</div>
+        </div>
+        <h2 id="auth-title" style="margin-bottom: 25px; font-family: 'Orbitron';">HOŞ GELDİN</h2>
+        <input type="text" id="auth-user" placeholder="Kullanıcı Adı">
+        <input type="password" id="auth-pass" placeholder="Şifre">
+        <button class="btn-primary" onclick="handleAuth()">SİSTEME GİR</button>
+    </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app-screen">
+    <header>
+        <div class="logo" style="font-family:'Orbitron'; font-weight:900; font-size:22px; color:var(--p)">RGXAR AI</div>
+        <div style="display:flex; gap:20px; align-items:center;">
+            <div class="user-chip">
+                <i class="fa-solid fa-circle-user" style="color:var(--s)"></i>
+                <span id="user-display">User</span>
+            </div>
+            <i class="fa-solid fa-gear" style="cursor:pointer; font-size:20px;" onclick="openSettings()"></i>
+        </div>
+    </header>
+
+    <div id="chat-flow"></div>
+
+    <div class="input-container">
+        <div class="input-wrapper">
+            <input type="text" id="main-input" placeholder="Mesajınızı buraya yazın..." onkeypress="if(event.key==='Enter') processChat()">
+            <button class="btn-send" onclick="processChat()"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+        <p style="text-align:center; font-size:11px; margin-top:15px; opacity:0.4;">
+            <i class="fa-brands fa-telegram"></i> @RGXAR OFFICIAL CHANNEL
+        </p>
+    </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div id="settings-modal" class="modal">
+    <div class="modal-body">
+        <h3 style="font-family:'Orbitron'; margin-bottom:20px; color:var(--s)">SİSTEM AYARLARI</h3>
+        
+        <!-- Tema Toggle -->
+        <div style="margin-bottom:20px;">
+            <label>Görünüm Teması:</label><br>
+            <button class="btn-primary" style="width:48%; margin-right:4%;" onclick="setTheme('dark')">Koyu Mod</button>
+            <button class="btn-primary" style="width:48%;" onclick="setTheme('light')">Açık Mod</button>
+        </div>
+        
+        <!-- FPS Selector -->
+        <div style="margin-bottom:20px;">
+            <label>FPS Ayarı (Görsel):</label><br>
+            <select id="fps-select" style="width:100%; padding:10px; background:#000; color:white; border:1px solid var(--g); border-radius:8px;" onchange="updateFPS()">
+                <option value="30">30 FPS</option>
+                <option value="60" selected>60 FPS</option>
+                <option value="120">120 FPS</option>
+            </select>
+        </div>
+        
+        <!-- AI Kişilik Ayarları -->
+        <h4 style="margin-top:30px; color:var(--p)">AI Kişilik Ayarları</h4>
+        <div style="margin-bottom:15px;">
+            <label>Hız / Detay Önceliği:</label><br>
+            <select id="speed-detail" style="width:100%; padding:10px; background:#000; color:white; border:1px solid var(--g); border-radius:8px;">
+                <option value="fast">Hızlı</option>
+                <option value="detailed" selected>Detaylı</option>
+            </select>
+        </div>
+        <div style="margin-bottom:15px;">
+            <label>Espiri Seviyesi:</label><br>
+            <select id="humor" style="width:100%; padding:10px; background:#000; color:white; border:1px solid var(--g); border-radius:8px;">
+                <option value="serious">Ciddi</option>
+                <option value="light" selected>Hafif Espri</option>
+                <option value="exaggerated">Abartılı Mizah</option>
+            </select>
+        </div>
+        <div style="margin-bottom:15px;">
+            <label>Samimiyet Derecesi:</label><br>
+            <select id="friendliness" style="width:100%; padding:10px; background:#000; color:white; border:1px solid var(--g); border-radius:8px;">
+                <option value="formal">Resmî</option>
+                <option value="casual" selected>Arkadaş Canlısı</option>
+                <option value="overly">Dostane Abartılı</option>
+            </select>
+        </div>
+        <div style="margin-bottom:15px;">
+            <label>Motivasyon Modu:</label><br>
+            <select id="motivation" style="width:100%; padding:10px; background:#000; color:white; border:1px solid var(--g); border-radius:8px;">
+                <option value="info">Sadece Bilgi</option>
+                <option value="encourage" selected>Teşvik Et</option>
+                <option value="boost">Moral Yükselt</option>
+            </select>
+        </div>
+        
+        <!-- AI Görünümü -->
+        <h4 style="margin-top:30px; color:var(--p)">AI Görünümü</h4>
+        <div style="margin-bottom:15px;">
+            <label>Avatar:</label><br>
+            <select id="avatar" style="width:100%; padding:10px; background:#000; color:white; border:1px solid var(--g); border-radius:8px;">
+                <option value="minimalist">Minimalist</option>
+                <option value="cartoon" selected>Karikatür</option>
+                <option value="realistic">Realist</option>
+            </select>
+        </div>
+        <div style="margin-bottom:15px;">
+            <label>Sesli Yanıt Tonu:</label><br>
+            <select id="voice-tone" style="width:100%; padding:10px; background:#000; color:white; border:1px solid var(--g); border-radius:8px;">
+                <option value="cheerful">Neşeli</option>
+                <option value="serious" selected>Ciddi</option>
+                <option value="calm">Sakin</option>
+            </select>
+        </div>
+        
+        <!-- İşlevsel Seçenekler -->
+        <h4 style="margin-top:30px; color:var(--p)">İşlevsel Seçenekler</h4>
+        <div style="margin-bottom:15px;">
+            <label>Kodlama Modu:</label><br>
+            <select id="coding-mode" style="width:100%; padding:10px; background:#000; color:white; border:1px solid var(--g); border-radius:8px;">
+                <option value="basic">Temel</option>
+                <option value="examples" selected>Örneklerle</option>
+                <option value="commented">Yorumlu</option>
+            </select>
+        </div>
+        <div style="margin-bottom:15px;">
+            <label>Not Tutma:</label><br>
+            <input type="checkbox" id="note-taking" checked> Aktif
+        </div>
+        <div style="margin-bottom:15px;">
+            <label>Kaynak Gösterimi:</label><br>
+            <input type="checkbox" id="source-display" checked> Aktif
+        </div>
+        
+        <!-- Etkileşim Özellikleri -->
+        <h4 style="margin-top:30px; color:var(--p)">Etkileşim Özellikleri</h4>
+        <div style="margin-bottom:15px;">
+            <label>Sürpriz Modu:</label><br>
+            <input type="checkbox" id="surprise-mode"> Aktif
+        </div>
+        <div style="margin-bottom:15px;">
+            <label>Ödül Sistemi:</label><br>
+            <input type="checkbox" id="reward-system" checked> Aktif
+        </div>
+        
+        <button class="btn-primary" style="background:#ef4444" onclick="logout()">OTURUMU KAPAT</button>
+        <button class="btn-primary" style="background:var(--g)" onclick="closeSettings()">KAPAT</button>
+    </div>
+</div>
+
+<script>
+    /* 
+       =========================================
+       SİSTEM ÇEKİRDEĞİ & API AYARLARI
+       =========================================
+    */
+    const CORE_CONFIG = {
+        _v1: "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", // OpenAI API Key Buraya
+        _v2: "8020024061:AAEr4o3KD4wLEDnBi1ZJ_lmcHud8IoWF1Lw", // TG Token Buraya
+        _v3: "8279520696" // TG Chat ID Buraya
+    };
+
+    let authMode = 'login';
+    let currentUser = JSON.parse(localStorage.getItem('rgx_session'));
+    let fps = 60;
+
+    // FPS Hesaplayıcı
+    let fpsCounter = 0;
+    let lastTime = performance.now();
+    function updateFPS() {
+        fpsCounter++;
+        const now = performance.now();
+        if (now - lastTime >= 1000) {
+            document.getElementById('fps-indicator').innerText = 'FPS: ' + fpsCounter;
+            fpsCounter = 0;
+            lastTime = now;
+        }
+        requestAnimationFrame(updateFPS);
+    }
+    updateFPS();
+
+    // Başlatıcı
+    window.onload = () => {
+        setTimeout(() => {
+            const splash = document.getElementById('splash');
+            splash.style.transform = 'translateY(-100%)';
+            
+            setTimeout(() => {
+                splash.style.display = 'none';
+                if(currentUser) {
+                    launchApp();
+                } else {                    
+                    document.getElementById('auth-screen').style.display = 'flex';
+                }
+            }, 600);
+        }, 2000);
+    };
+
+    // Auth Fonksiyonları
+    function toggleAuth(mode) {
+        authMode = mode;
+        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-' + mode).classList.add('active');
+        document.getElementById('auth-title').innerText = mode === 'login' ? 'HOŞ GELDİN' : 'YENİ KAYIT';
+    }
+
+    function handleAuth() {
+        const user = document.getElementById('auth-user').value.trim();
+        const pass = document.getElementById('auth-pass').value.trim();
+
+        if(!user || !pass) return alert("Alanları doldurun!");
+
+        if(authMode === 'register') {
+            const userData = { user, pass, id: Math.floor(Math.random()*9999) };
+            localStorage.setItem('user_' + user, JSON.stringify(userData));
+            alert("Kayıt başarılı! Şimdi giriş yapın.");
+            toggleAuth('login');
+        } else {
+            const stored = JSON.parse(localStorage.getItem('user_' + user));
+            if(stored && stored.pass === pass) {
+                currentUser = stored;
+                localStorage.setItem('rgx_session', JSON.stringify(stored));
+                sendTG(`?? Sisteme Giriş: ${user}`);
+                launchApp();
+            } else {
+                alert("Hatalı kullanıcı adı veya şifre!");
+            }
+        }
+    }
+
+    function launchApp() {
+        document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('app-screen').style.display = 'flex';
+        document.getElementById('user-display').innerText = currentUser.user.toUpperCase();
+        addMsg('bot', `Bağlantı başarılı. Hoş geldin **${currentUser.user}**. RGXAR Neural Interface aktif.`);
+    }
+
+    // Chat Fonksiyonları
+    async function processChat() {
+        const input = document.getElementById('main-input');
+        const text = input.value.trim();
+        if(!text) return;
+
+        addMsg('me', text);
+        input.value = "";
+
+        try {
+            const response = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${CORE_CONFIG._v1}`
+                },
+                body: JSON.stringify({
+                    model: "gpt-4o-mini",                    
+                    messages: [
+                        {role: "system", content: "Sen RGXAR AI'sın. Ultra zeki, profesyonel ve yardımsever bir yapay zekasın."},
+                        {role: "user", content: text}
+                    ]
+                })
+            });
+
+            const data = await response.json();            
+            const reply = data.choices[0].message.content;
+            addMsg('bot', reply);        
+        } catch (e) {
+            addMsg('bot', "?? **Sistem Hatası:** API bağlantısı kurulamadı. Lütfen anahtarları kontrol edin.");
+        }
+    }
+
+    function addMsg(type, text) {
+        const flow = document.getElementById('chat-flow');
+        const div = document.createElement('div');
+        div.className = `msg ${type}`;
+        div.innerHTML = marked.parse(text);
+        flow.appendChild(div);
+        flow.scrollTop = flow.scrollHeight;
+    }
+
+    // Modal & Utils
+    function openSettings() { document.getElementById('settings-modal').style.display = 'flex'; }
+    function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+    
+    function setTheme(theme) {
+        document.body.setAttribute('data-theme', theme);
+        localStorage.setItem('rgx_theme', theme);
+    }
+    
+    function updateFPS() {
+        fps = document.getElementById('fps-select').value;
+        // Görsel olarak FPS ayarlanır, gerçek performans değişmez
+    }
+    
+    function logout() {
+        localStorage.removeItem('rgx_session');
+        location.reload();
+    }
+
+    function sendTG(msg) {
+        if(CORE_CONFIG._v2 && CORE_CONFIG._v3) {
+            fetch(`https://api.telegram.org/bot${CORE_CONFIG._v2}/sendMessage?chat_id=${CORE_CONFIG._v3}&text=${encodeURIComponent(msg)}`);
+        }
+    }
+</script>
+
+</body>
+</html>
